@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Invernadero</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial; background: #1a1a1a; color: #fff; padding: 20px; }
+   .card { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 10px; }
+   .temp { font-size: 32px; color: #00ff88; }
+  </style>
+</head>
+<body>
+  <h1>🌱 Invernadero en Vivo</h1>
+
+  <div class="card">
+    <div>Temperatura</div>
+    <div class="temp" id="temp">-- °C</div>
+  </div>
+
+  <div class="card">
+    <div>Estado WS: <span id="estado">Conectando...</span></div>
+  </div>
+
+<script>
+const ws = new WebSocket(`wss://${location.host}/ws`);
+
+ws.onopen = () => {
+  document.getElementById('estado').textContent = 'Conectado ✅';
+}
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if(data.temp) document.getElementById('temp').textContent = data.temp + ' °C';
+  console.log('Datos:', data);
+}
+
+ws.onclose = () => {
+  document.getElementById('estado').textContent = 'Desconectado ❌';
+}
+</script>
+</body>
+</html>
