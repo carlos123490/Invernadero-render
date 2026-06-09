@@ -1,49 +1,68 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-import json
+from fastapi.responses import HTMLResponse
+import asyncio
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# HTML de la web
+html = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Invernadero en Vivo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial; background: #1a1a1a; color: white; text-align: center; padding: 50px; }
+h1 { font-size: 2em; }
+.temp { font-size: 4em; color: #4CAF50; }
+.status { margin-top: 30px; padding: 10px; border-radius: 8px; }
+.connected { background: #2e7d32; }
+.disconnected { background: #c62828; }
+</style>
+</head>
+<body>
+<h1>🌱 Invernadero en Vivo</h1>
+<div class="temp">Temperatura: <span id="temp">--</span> °C</div>
+<div class="temp">Humedad: <span id="hum">--</span> %</div>
+<div id="status" class="status disconnected">Estado WS: Desconectado ❌</div>
 
-clientes_web = set()
+<script>
+let ws;
+function connect() {
+  ws = new WebSocket("wss://invernadero-render.onrender.com/ws");
+  ws.onopen = () => {
+    document.getElementById("status").className = "status connected";
+    document.getElementById("status").innerHTML = "Estado WS: Conectado ✅";
+  };
+  ws.onmessage = (event) => {
+    let data = JSON.parse(event.data);
+    document.getElementById("temp").innerHTML = data.temp.toFixed(1);
+    document.getElementById("hum").innerHTML = data.hum.toFixed(0);
+  };
+  ws.onclose = () => {
+    document.getElementById("status").className = "status disconnected";
+    document.getElementById("status").innerHTML = "Estado WS: Desconectado ❌";
+    setTimeout(connect, 3000);
+  };
+}
+connect();
+</script>
+</body>
+</html>
+"""
 
-# Sirve el index.html automáticamente
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+@app.get("/")
+async def get():
+    return HTMLResponse(html)
 
+# ESTO ES LO QUE TE FALTABA
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    clientes_web.add(ws)
-    print("Cliente conectado")
-
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
     try:
         while True:
-            data_str = await ws.receive_text()
-            data = json.loads(data_str)
-
-            # Normalizar llaves por si acaso
-            data_norm = {k.lower().replace("_", "").replace(" ", ""): v for k, v in data.items()}
-            print(f"[WS] Datos: {data_norm}")
-
-            # Reenviar a todos los navegadores conectados
-            for cliente in list(clientes_web):
-                if cliente!= ws:
-                    try:
-                        await cliente.send_text(json.dumps(data_norm))
-                    except:
-                        clientes_web.discard(cliente)
-
+            data = await websocket.receive_text()
+            # Reenvía los datos a todos los navegadores conectados
+            await websocket.send_text(data)
     except WebSocketDisconnect:
-        clientes_web.discard(ws)
-        print("Cliente desconectado")
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+        pass
