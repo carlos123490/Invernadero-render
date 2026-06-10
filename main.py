@@ -1,16 +1,18 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import uvicorn
+import time
 
 app = FastAPI()
 
-# Estados de los 4 relés
+# Estados de los 4 relés: 0=apagado, 1=encendido
 reles = {"r1":0, "r2":0, "r3":0, "r4":0}
 timers = {"r1":0, "r2":0, "r3":0, "r4":0}
 timer_start = {"r1":0, "r2":0, "r3":0, "r4":0}
+
+# Datos del sensor
 temp = 25.0
 hum = 60.0
-import time
 
 html = """
 <!DOCTYPE html>
@@ -21,27 +23,27 @@ html = """
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', Arial; background: #0f1b2e; color: white; padding: 15px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
 h1 { color: #4CAF50; font-size: 1.5em; }
 .time-temp { text-align: right; font-size: 0.9em; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-width: 800px; margin: auto; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-width: 900px; margin: auto; }
 .card { background: #1e2a3a; border-radius: 12px; padding: 15px; border: 2px solid #2a3f5f; }
-.card h3 { color: #64b5f6; margin-bottom: 10px; }
-.status { font-size: 0.85em; margin-bottom: 8px; }
+.card h3 { color: #64b5f6; margin-bottom: 10px; font-size: 1.1em; }
+.status { font-size: 0.9em; margin-bottom: 8px; font-weight: bold; }
 .status.on { color: #4CAF50; }
 .status.off { color: #f44336; }
 .switch { display: flex; gap: 8px; margin: 10px 0; }
-.switch button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.switch button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.9em; }
 .btn-on { background: #4CAF50; color: white; }
 .btn-off { background: #555; color: #ccc; }
-.timer { background: #162032; padding: 10px; border-radius: 8px; text-align: center; font-size: 1.8em; font-family: monospace; margin: 10px 0; }
+.timer { background: #162032; padding: 12px; border-radius: 8px; text-align: center; font-size: 2em; font-family: monospace; margin: 10px 0; color: #64b5f6; }
 .timer-btns { display: flex; gap: 8px; }
-.timer-btns button { flex: 1; padding: 8px; border: none; border-radius: 6px; background: #2196F3; color: white; cursor: pointer; }
+.timer-btns button { flex: 1; padding: 10px; border: none; border-radius: 6px; background: #2196F3; color: white; cursor: pointer; font-weight: bold; }
 .timer-set { display: flex; gap: 5px; margin-top: 8px; }
-.timer-set input { flex: 1; padding: 8px; border-radius: 6px; border: none; background: #0f1b2e; color: white; text-align: center; }
-.timer-set button { padding: 8px 15px; background: #4CAF50; border: none; border-radius: 6px; color: white; cursor: pointer; }
+.timer-set input { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #2a3f5f; background: #0f1b2e; color: white; text-align: center; }
+.timer-set button { padding: 8px 15px; background: #4CAF50; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; }
 #status { text-align: center; padding: 12px; border-radius: 8px; margin-top: 20px; font-weight: bold; background: #2e7d32; }
-@media (max-width: 600px) {.grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {.grid { grid-template-columns: 1fr; }}
 </style>
 </head>
 <body>
@@ -56,7 +58,7 @@ h1 { color: #4CAF50; font-size: 1.5em; }
 <div class="grid">
   <div class="card">
     <h3>Bomba 1</h3>
-    <div class="status" id="s1">Estado: APAGADO</div>
+    <div class="status off" id="s1">Estado: APAGADO</div>
     <div class="switch">
       <button class="btn-on" onclick="send(1,1)">ENCENDER</button>
       <button class="btn-off" onclick="send(1,0)">APAGADO</button>
@@ -67,15 +69,15 @@ h1 { color: #4CAF50; font-size: 1.5em; }
       <button onclick="send(1,0)">STOP</button>
     </div>
     <div class="timer-set">
-      <input type="number" id="m1" placeholder="Min" min="0">
-      <input type="number" id="s1in" placeholder="Seg" min="0" max="59">
+      <input type="number" id="m1" placeholder="Min" min="0" value="5">
+      <input type="number" id="s1in" placeholder="Seg" min="0" max="59" value="0">
       <button onclick="setTimer(1)">Set</button>
     </div>
   </div>
 
   <div class="card">
     <h3>Ventilador</h3>
-    <div class="status" id="s2">Estado: APAGADO</div>
+    <div class="status off" id="s2">Estado: APAGADO</div>
     <div class="switch">
       <button class="btn-on" onclick="send(2,1)">ENCENDER</button>
       <button class="btn-off" onclick="send(2,0)">APAGADO</button>
@@ -86,15 +88,15 @@ h1 { color: #4CAF50; font-size: 1.5em; }
       <button onclick="send(2,0)">STOP</button>
     </div>
     <div class="timer-set">
-      <input type="number" id="m2" placeholder="Min" min="0">
-      <input type="number" id="s2in" placeholder="Seg" min="0" max="59">
+      <input type="number" id="m2" placeholder="Min" min="0" value="10">
+      <input type="number" id="s2in" placeholder="Seg" min="0" max="59" value="0">
       <button onclick="setTimer(2)">Set</button>
     </div>
   </div>
 
   <div class="card">
     <h3>Luz LED</h3>
-    <div class="status" id="s3">Estado: APAGADO</div>
+    <div class="status off" id="s3">Estado: APAGADO</div>
     <div class="switch">
       <button class="btn-on" onclick="send(3,1)">ENCENDER</button>
       <button class="btn-off" onclick="send(3,0)">APAGADO</button>
@@ -105,15 +107,15 @@ h1 { color: #4CAF50; font-size: 1.5em; }
       <button onclick="send(3,0)">STOP</button>
     </div>
     <div class="timer-set">
-      <input type="number" id="m3" placeholder="Min" min="0">
-      <input type="number" id="s3in" placeholder="Seg" min="0" max="59">
+      <input type="number" id="m3" placeholder="Min" min="0" value="30">
+      <input type="number" id="s3in" placeholder="Seg" min="0" max="59" value="0">
       <button onclick="setTimer(3)">Set</button>
     </div>
   </div>
 
   <div class="card">
     <h3>Bomba 2</h3>
-    <div class="status" id="s4">Estado: APAGADO</div>
+    <div class="status off" id="s4">Estado: APAGADO</div>
     <div class="switch">
       <button class="btn-on" onclick="send(4,1)">ENCENDER</button>
       <button class="btn-off" onclick="send(4,0)">APAGADO</button>
@@ -124,8 +126,8 @@ h1 { color: #4CAF50; font-size: 1.5em; }
       <button onclick="send(4,0)">STOP</button>
     </div>
     <div class="timer-set">
-      <input type="number" id="m4" placeholder="Min" min="0">
-      <input type="number" id="s4in" placeholder="Seg" min="0" max="59">
+      <input type="number" id="m4" placeholder="Min" min="0" value="3">
+      <input type="number" id="s4in" placeholder="Seg" min="0" max="59" value="0">
       <button onclick="setTimer(4)">Set</button>
     </div>
   </div>
@@ -134,7 +136,7 @@ h1 { color: #4CAF50; font-size: 1.5em; }
 <div id="status">Estado: Conectado ✅</div>
 
 <script>
-let timerVals = {1:0, 2:0, 3:0, 4:0};
+let timerVals = {1:300, 2:600, 3:1800, 4:180}; // valores por defecto en segundos
 
 function send(relay, state) {
   fetch(`/toggle?r=r${relay}&s=${state}`);
@@ -155,16 +157,17 @@ function startTimer(r) {
 // Actualizar datos cada 2 seg
 setInterval(() => {
   fetch("/getdata")
- .then(r => r.json())
- .then(d => {
+.then(r => r.json())
+.then(d => {
     document.getElementById("temp").innerHTML = d.temp.toFixed(1);
     document.getElementById("hum").innerHTML = d.hum.toFixed(0);
     document.getElementById("time").innerHTML = new Date().toLocaleTimeString();
 
     for(let i=1; i<=4; i++) {
       let st = d["r"+i];
-      document.getElementById("s"+i).className = "status " + (st?"on":"off");
-      document.getElementById("s"+i).innerHTML = "Estado: " + (st?"ENCENDIDO":"APAGADO");
+      let el = document.getElementById("s"+i);
+      el.className = "status " + (st?"on":"off");
+      el.innerHTML = "Estado: " + (st?"ENCENDIDO":"APAGADO");
 
       let sec = d["t"+i];
       if(sec < 0) sec = 0;
@@ -174,6 +177,10 @@ setInterval(() => {
       document.getElementById("t"+i).innerHTML =
         String(h).padStart(2,'0')+":"+String(m).padStart(2,'0')+":"+String(s).padStart(2,'0');
     }
+  })
+.catch(() => {
+    document.getElementById("status").innerHTML = "Estado: Sin conexión ⚠️";
+    document.getElementById("status").style.background = "#c62828";
   });
 }, 2000);
 </script>
@@ -188,7 +195,8 @@ async def home():
 @app.get("/toggle")
 async def toggle(r: str, s: int):
     reles[r] = s
-    if s == 0: timers[r] = 0
+    if s == 0: 
+        timers[r] = 0
     return "OK"
 
 @app.get("/timer")
@@ -214,7 +222,7 @@ async def data(t: float, h: float):
                 timers[r] = 0
                 reles[r] = 0
 
-    # Responder al ESP32: estados de relés
+    # Responder al ESP32: estados de relés separados por coma
     return f"{reles['r1']},{reles['r2']},{reles['r3']},{reles['r4']}"
 
 @app.get("/getdata")
