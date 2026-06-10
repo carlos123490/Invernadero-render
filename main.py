@@ -56,13 +56,14 @@ async def get():
     return HTMLResponse(html)
 
 # ESTO ES LO QUE TE FALTABA
+from fastapi import WebSocket, WebSocketDisconnect
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
             data = await websocket.receive_text()
-            # Reenvía los datos a todos los navegadores conectados
             await websocket.send_text(data)
     except WebSocketDisconnect:
         pass
